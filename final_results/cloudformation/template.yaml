@@ -1,0 +1,279 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: URL Shortener API - Serverless application for creating and managing shortened URLs
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: Project name used for resource naming convention
+    Default: url-shortener
+    AllowedPattern: ^[a-z0-9-]+$
+    ConstraintDescription: Must contain only lowercase letters, numbers, and hyphens
+  
+  LogRetentionDays:
+    Type: Number
+    Description: CloudWatch log retention period in days
+    Default: 7
+    AllowedValues:
+      - 1
+      - 3
+      - 5
+      - 7
+      - 14
+      - 30
+      - 60
+      - 90
+      - 120
+      - 150
+      - 180
+      - 365
+      - 400
+      - 545
+      - 731
+      - 1827
+      - 3653
+  
+  AWSRegion:
+    Type: String
+    Description: AWS region for deployment
+    Default: us-east-1
+  
+  AWSAccountId:
+    Type: String
+    Description: AWS account ID for resource naming
+    AllowedPattern: ^\d{12}$
+    ConstraintDescription: Must be a 12-digit AWS account ID
+
+Resources:
+  # DynamoDB Table for URL Mappings
+  URLMappingsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${ProjectName}-${AWSRegion}-${AWSAccountId}-url-mappings'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: short_code
+          AttributeType: S
+        - AttributeName: original_url
+          AttributeType: S
+      KeySchema:
+        - AttributeName: short_code
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: OriginalURLIndex
+          KeySchema:
+            - AttributeName: original_url
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: SAM
+
+  # Create URL Lambda Function
+  CreateURLFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-${AWSRegion}-${AWSAccountId}-create-url'
+      CodeUri: ../src/create-url/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.13
+      Architectures:
+        - x86_64
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref URLMappingsTable
+          LOG_LEVEL: INFO
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref URLMappingsTable
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins:
+            - '*'
+          AllowMethods:
+            - POST
+          AllowHeaders:
+            - '*'
+      Tags:
+        Project: !Ref ProjectName
+        ManagedBy: SAM
+  
+  CreateURLLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ProjectName}-${AWSRegion}-${AWSAccountId}-create-url'
+      RetentionInDays: !Ref LogRetentionDays
+
+  # Get URL Lambda Function
+  GetURLFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-${AWSRegion}-${AWSAccountId}-get-url'
+      CodeUri: ../src/get-url/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.13
+      Architectures:
+        - x86_64
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref URLMappingsTable
+          LOG_LEVEL: INFO
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+                - dynamodb:UpdateItem
+              Resource:
+                - !GetAtt URLMappingsTable.Arn
+                - !Sub '${URLMappingsTable.Arn}/index/*'
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins:
+            - '*'
+          AllowMethods:
+            - GET
+          AllowHeaders:
+            - '*'
+      Tags:
+        Project: !Ref ProjectName
+        ManagedBy: SAM
+  
+  GetURLLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ProjectName}-${AWSRegion}-${AWSAccountId}-get-url'
+      RetentionInDays: !Ref LogRetentionDays
+
+  # List URLs Lambda Function
+  ListURLsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-${AWSRegion}-${AWSAccountId}-list-urls'
+      CodeUri: ../src/list-urls/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.13
+      Architectures:
+        - x86_64
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref URLMappingsTable
+          LOG_LEVEL: INFO
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Scan
+              Resource:
+                - !GetAtt URLMappingsTable.Arn
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins:
+            - '*'
+          AllowMethods:
+            - GET
+          AllowHeaders:
+            - '*'
+      Tags:
+        Project: !Ref ProjectName
+        ManagedBy: SAM
+  
+  ListURLsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ProjectName}-${AWSRegion}-${AWSAccountId}-list-urls'
+      RetentionInDays: !Ref LogRetentionDays
+
+  # Delete URL Lambda Function
+  DeleteURLFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-${AWSRegion}-${AWSAccountId}-delete-url'
+      CodeUri: ../src/delete-url/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.13
+      Architectures:
+        - x86_64
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref URLMappingsTable
+          LOG_LEVEL: INFO
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:DeleteItem
+              Resource:
+                - !GetAtt URLMappingsTable.Arn
+                - !Sub '${URLMappingsTable.Arn}/index/*'
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins:
+            - '*'
+          AllowMethods:
+            - DELETE
+          AllowHeaders:
+            - '*'
+      Tags:
+        Project: !Ref ProjectName
+        ManagedBy: SAM
+  
+  DeleteURLLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ProjectName}-${AWSRegion}-${AWSAccountId}-delete-url'
+      RetentionInDays: !Ref LogRetentionDays
+
+Outputs:
+  URLMappingsTableName:
+    Description: DynamoDB table name for URL mappings
+    Value: !Ref URLMappingsTable
+    Export:
+      Name: !Sub '${AWS::StackName}-URLMappingsTableName'
+  
+  URLMappingsTableArn:
+    Description: DynamoDB table ARN for URL mappings
+    Value: !GetAtt URLMappingsTable.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-URLMappingsTableArn'
+  
+  CreateURLEndpoint:
+    Description: Create URL Function URL endpoint
+    Value: !GetAtt CreateURLFunctionUrl.FunctionUrl
+    Export:
+      Name: !Sub '${AWS::StackName}-CreateURLEndpoint'
+  
+  GetURLEndpoint:
+    Description: Get URL Function URL endpoint
+    Value: !GetAtt GetURLFunctionUrl.FunctionUrl
+    Export:
+      Name: !Sub '${AWS::StackName}-GetURLEndpoint'
+  
+  ListURLsEndpoint:
+    Description: List URLs Function URL endpoint
+    Value: !GetAtt ListURLsFunctionUrl.FunctionUrl
+    Export:
+      Name: !Sub '${AWS::StackName}-ListURLsEndpoint'
+  
+  DeleteURLEndpoint:
+    Description: Delete URL Function URL endpoint
+    Value: !GetAtt DeleteURLFunctionUrl.FunctionUrl
+    Export:
+      Name: !Sub '${AWS::StackName}-DeleteURLEndpoint'
