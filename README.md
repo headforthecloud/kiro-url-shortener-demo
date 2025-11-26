@@ -13,8 +13,9 @@ The specific items in the repository are explained below:
 *(video timecode 00:40)*
 
 This was a simple demonstration - it shows the use of two prompts to generate code
-1. create a python function that generates a 6 character for an input string
-1. convert the code to a aws lambda function
+> _create a python function that generates a 6 character for an input string_
+>
+> _convert the code to a aws lambda function_
 
 step 1 generates some straightforward Python code, which is then converted to a lambda function using the second prompt
 
@@ -46,6 +47,10 @@ This will lead to an updated set of specification documents - examples can be fo
 ## Phase 4 - Final Results
 *(video timecode 10:55)*
 I've included the code generated in the demo - this is split into 3 parts:
-1. The Python code used to generate the lambdas for the API
-1. The unit tests that can be used to validate the code from 1.
-1. The CloudFormation that can be used to deploy the results into an AWS account for testing
+1. The Python code used to generate the lambdas for the API - [here](./phase_3/final_results/src/)
+1. The unit tests that can be used to validate the code from 1 - [here](./phase_3/final_results/tests)
+1. The CloudFormation that can be used to deploy the results into an AWS account for testing  - [here](./phase_3/final_results/cloudformation/)
+
+The session also generated a [README](./phase_3/final_results/README.md) file that includes architecture diagram, pre-requisites, and how to test the generated code.
+
+If you have any questions, feel free to reach out to me - I'm on [LinkedIn](https://www.linkedin.com/in/simonhanmer/).
